@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petualangan Kode Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+        }
+        .grid-cell {
+            width: 100%;
+            padding-bottom: 100%;
+            position: relative;
+        }
+        .cell-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            transition: all 0.3s ease-in-out;
+        }
+        #player {
+            transition: transform 0.3s linear, top 0.4s ease-in-out, left 0.4s ease-in-out;
+            z-index: 10;
+            font-size: 2.2rem;
+        }
+        .rotate-0 { transform: rotate(0deg); }
+        .rotate-90 { transform: rotate(90deg); }
+        .rotate-180 { transform: rotate(180deg); }
+        .rotate-270 { transform: rotate(270deg); }
+        .command-btn { transition: all 0.2s ease; }
+        .command-btn:active { transform: scale(0.95); background-color: #3b82f6; }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); transition: opacity 0.3s ease-in-out; }
+        .modal-content { transition: transform 0.3s ease-in-out; }
+        .character-choice { cursor: pointer; transition: transform 0.2s ease, background-color 0.2s ease; }
+        .character-choice:hover { transform: scale(1.1); background-color: #e0f2fe; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { border: 1px solid #ccc; display: inline-block; padding: 6px 12px; cursor: pointer; background-color: #f0f0f0; border-radius: 8px; }
+        .small-coin { font-size: 1.5rem; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <audio id="bg-music" loop></audio>
+
+    <div class="w-full max-w-7xl mx-auto">
+        <div class="relative text-center">
+             <h1 class="text-3xl font-bold text-blue-600 mb-1">Petualangan Kode</h1>
+             <button id="sound-toggle-btn" class="absolute top-0 right-0 text-2xl p-2 rounded-full hover:bg-gray-200 focus:outline-none">🔇</button>
+        </div>
+        <p class="text-center text-gray-600 mb-4">Susun perintah untuk mencapai harta karun!</p>
+
+        <div class="flex flex-col lg:flex-row items-start justify-center gap-6">
+            
+            <div class="w-full lg:w-3/5">
+                <div class="w-full max-w-2xl mx-auto bg-white p-3 rounded-lg shadow-md flex justify-between items-center mb-4">
+                    <div id="score-display" class="text-2xl font-bold text-blue-600">
+                        Skor: <span id="score-value">0</span>
+                    </div>
+                    <div id="lives-display" class="flex gap-1 text-3xl"></div>
+                </div>
+
+                <div class="w-full max-w-2xl mx-auto">
+                    <div id="game-board-container" class="relative w-full bg-emerald-300 border-4 border-emerald-500 rounded-lg shadow-lg">
+                        <div id="game-board" class="grid-container"></div>
+                        <div id="player" class="cell-content absolute"></div>
+                    </div>
+                    <div id="message-box" class="text-center font-semibold text-blue-700 mt-2 h-6"></div>
+                </div>
+            </div>
+
+            <div class="w-full lg:w-2/5 max-w-2xl lg:max-w-xs mx-auto">
+                <div class="bg-white p-4 rounded-lg shadow-lg">
+                    <div class="flex flex-col gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold mb-3">Panel Kontrol</h2>
+                            <div class="space-y-3">
+                                <button onclick="addCommand('maju')" class="command-btn w-full bg-blue-500 text-white p-3 rounded-lg font-bold shadow-md hover:bg-blue-600 flex items-center justify-center gap-2">
+                                    <span class="text-2xl">↑</span> MAJU
+                                </button>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button onclick="addCommand('kiri')" class="command-btn bg-blue-500 text-white p-3 rounded-lg font-bold shadow-md hover:bg-blue-600 flex items-center justify-center gap-2">
+                                        <span class="text-2xl">↺</span> KIRI
+                                    </button>
+                                    <button onclick="addCommand('kanan')" class="command-btn bg-blue-500 text-white p-3 rounded-lg font-bold shadow-md hover:bg-blue-600 flex items-center justify-center gap-2">
+                                        <span class="text-2xl">↻</span> KANAN
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h2 class="text-xl font-bold mb-2">Program Anda</h2>
+                            <div id="program-list" class="bg-gray-100 border rounded-md h-32 p-2 mb-2 overflow-y-auto flex flex-wrap gap-2 content-start"></div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <button onclick="executeProgram()" id="run-btn" class="col-span-3 bg-green-500 text-white py-3 px-2 rounded-lg font-bold shadow-md hover:bg-green-600 flex items-center justify-center gap-2">▶️ JALANKAN</button>
+                                <button onclick="clearProgram()" class="bg-yellow-500 text-white p-2 rounded-lg font-semibold shadow-md hover:bg-yellow-600 col-span-2">Hapus Program</button>
+                                <button onclick="initializeGame()" class="bg-red-500 text-white p-2 rounded-lg font-semibold shadow-md hover:bg-red-600">Ulangi</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="music-upload" class="custom-file-upload font-semibold hover:bg-gray-200">🎵 Unggah Musik</label>
+                            <input id="music-upload" type="file" accept="audio/*"/>
+                            <span id="music-name" class="text-sm text-gray-600 ml-2">Tidak ada musik dipilih</span>
+                        </div>
+                        <div>
+                            <label for="volume-slider" class="font-semibold text-sm">Volume Musik</label>
+                            <div class="flex items-center gap-2">
+                                <span>🔈</span>
+                                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <span>🔊</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="character-modal" class="fixed inset-0 z-50 items-center justify-center flex">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-11/12 max-w-lg relative m-4 text-center">
+            <h2 class="text-3xl font-bold mb-6 text-blue-600">Pilih Karaktermu!</h2>
+            <div class="grid grid-cols-5 gap-4">
+                <div onclick="selectCharacter('robot')" class="character-choice text-5xl p-4 rounded-lg">🤖</div>
+                <div onclick="selectCharacter('rocket')" class="character-choice text-5xl p-4 rounded-lg">🚀</div>
+                <div onclick="selectCharacter('unicorn')" class="character-choice text-5xl p-4 rounded-lg">🦄</div>
+                <div onclick="selectCharacter('trex')" class="character-choice text-5xl p-4 rounded-lg">🦖</div>
+                <div onclick="selectCharacter('petani')" class="character-choice text-5xl p-4 rounded-lg">👨‍🌾</div>
+                <div onclick="selectCharacter('motor')" class="character-choice text-5xl p-4 rounded-lg">🏍️</div>
+                <div onclick="selectCharacter('mobil')" class="character-choice text-5xl p-4 rounded-lg">🚗</div>
+                <div onclick="selectCharacter('kuda')" class="character-choice text-5xl p-4 rounded-lg">🐎</div>
+                <div onclick="selectCharacter('kucing')" class="character-choice text-5xl p-4 rounded-lg">🐈</div>
+            </div>
+        </div>
+    </div>
+    <div id="question-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-11/12 max-w-md relative m-4">
+            <h2 class="text-2xl font-bold mb-4" id="question-title">Rintangan!</h2>
+            <p id="question-text" class="mb-4 text-lg"></p>
+            <input type="text" id="answer-input" class="w-full border border-gray-300 p-2 rounded-lg mb-4" placeholder="Ketik jawabanmu...">
+            <button id="submit-answer-btn" class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold hover:bg-blue-600">Jawab</button>
+        </div>
+    </div>
+    <div id="win-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-11/12 max-w-md relative m-4 text-center">
+            <h2 class="text-3xl font-bold mb-4 text-yellow-500">✨ SELAMAT! ✨</h2>
+            <p class="mb-6 text-lg">Kamu berhasil mencapai harta karun!</p>
+            <button onclick="initializeGame(); closeWinModal();" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold hover:bg-green-600">Main Lagi</button>
+        </div>
+    </div>
+    <div id="game-over-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-11/12 max-w-md relative m-4 text-center">
+            <h2 class="text-3xl font-bold mb-4 text-red-500">GAME OVER</h2>
+            <p class="mb-2 text-lg">Yah, kesempatanmu habis.</p>
+            <p class="mb-6 text-lg font-bold">Skor Akhir: <span id="final-score">0</span></p>
+            <button onclick="initializeGame(); closeGameOverModal();" class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold hover:bg-blue-600">Coba Lagi</button>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            const GRID_X = 10;
+            const GRID_Y = 6;
+            
+            const gameBoard = document.getElementById('game-board');
+            const playerElement = document.getElementById('player');
+            const programList = document.getElementById('program-list');
+            const messageBox = document.getElementById('message-box');
+            const runBtn = document.getElementById('run-btn');
+            const scoreValue = document.getElementById('score-value');
+            const livesDisplay = document.getElementById('lives-display');
+            const characterModal = document.getElementById('character-modal');
+            const modal = document.getElementById('question-modal');
+            const winModal = document.getElementById('win-modal');
+            const gameOverModal = document.getElementById('game-over-modal');
+            const finalScore = document.getElementById('final-score');
+            const questionText = document.getElementById('question-text');
+            const answerInput = document.getElementById('answer-input');
+            const submitAnswerBtn = document.getElementById('submit-answer-btn');
+            
+            const characters = { 
+                robot: '🤖', rocket: '🚀', unicorn: '🦄', trex: '🦖',
+                petani: '👨‍🌾', motor: '🏍️', mobil: '🚗', kuda: '🐎', kucing: '🐈'
+            };
+            let selectedCharacter = characters.robot;
+
+            let player, start, finish, obstacles, program, previousPlayerState;
+            let isExecuting = false;
+            let currentObstacle = null;
+            let score, lives;
+            
+            const directionClasses = { 'up': 'rotate-0', 'right': 'rotate-90', 'down': 'rotate-180', 'left': 'rotate-270' };
+            
+            let isSoundOn = false;
+            const soundToggleButton = document.getElementById('sound-toggle-btn');
+            const bgMusicElement = document.getElementById('bg-music');
+            const musicUploadInput = document.getElementById('music-upload');
+            const musicNameSpan = document.getElementById('music-name');
+            const volumeSlider = document.getElementById('volume-slider');
+            let audioCtx;
+            
+            bgMusicElement.volume = volumeSlider.value;
+            volumeSlider.addEventListener('input', (e) => { bgMusicElement.volume = e.target.value; });
+
+            function playSfx(type) {
+                if (!isSoundOn || !audioCtx) return;
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                switch (type) {
+                    case 'click': oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1); break;
+                    case 'move': oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1); break;
+                    case 'obstacle': oscillator.frequency.setValueAtTime(220, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2); break;
+                    case 'correct': oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); setTimeout(() => oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime), 70); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2); break;
+                    case 'wrong': oscillator.frequency.setValueAtTime(130.81, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4); break;
+                    case 'win': oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); setTimeout(() => oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime), 100); setTimeout(() => oscillator.frequency.setValueAtTime(783.99, audioCtx.currentTime), 200); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4); break;
+                    case 'gameover': oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); setTimeout(() => oscillator.frequency.setValueAtTime(150, audioCtx.currentTime), 150); setTimeout(() => oscillator.frequency.setValueAtTime(100, audioCtx.currentTime), 300); gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5); break;
+                }
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.5);
+            }
+
+            window.toggleSound = function() {
+                if (!isSoundOn) {
+                    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { console.error("Web Audio API not supported"); return; } }
+                    audioCtx.resume(); isSoundOn = true; soundToggleButton.innerHTML = '🔊'; bgMusicElement.play().catch(e => console.error("Autoplay prevented.", e));
+                } else { isSoundOn = false; soundToggleButton.innerHTML = '🔇'; bgMusicElement.pause(); }
+            }
+            soundToggleButton.addEventListener('click', toggleSound);
+
+            musicUploadInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) { const objectURL = URL.createObjectURL(file); bgMusicElement.src = objectURL; musicNameSpan.textContent = file.name; if(isSoundOn) { bgMusicElement.play().catch(e => console.error("Could not play music.", e)); } }
+            });
+
+            // --- DAFTAR PERTANYAAN BARU ---
+            const ALL_QUESTIONS = [
+                { q: "Apa ibukota negara Indonesia?", a: "Jakarta" },
+                { q: "Hitunglah: 15 + 20 - 5 = ?", a: "30" },
+                { q: "Aku punya kota, tapi tidak punya rumah. Siapakah aku?", a: "Peta" },
+                { q: "Perubahan es menjadi air disebut….", a: "Mencair" },
+                { q: "Hewan yang bisa hidup di air dan darat?", a: "Amfibi" },
+                { q: "Pantai yang terkenal di kabupaten Tanah Bumbu adalah...?", a: "Pagatan" },
+                { q: "Siapa penemu bola lampu?", a: "Thomas Edison" },
+                { q: "Berapa jumlah provinsi di Indonesia (2024)?", a: "38" },
+                { q: "Gunung tertinggi di Indonesia adalah...", a: "Puncak Jaya" },
+                { q: "Lagu kebangsaan Indonesia adalah...", a: "Indonesia Raya" },
+                { q: "Saat Matahari berada tepat berada di jam 12 siang, maka udara akan terasa... ", a: "Panas" },
+                { q: "Ibu Kota Kabupaten Tanah Bumbu adalah... ", a: "Batulicin" },
+                { q: "Goa yang terkenal di Kecamatan Mantewe Kabupaten Tanah Bumbu adalah... ", a: "Goa Liang Bangkai"},
+            ];
+            
+            let questionPool = [];
+            function resetQuestionPool() { questionPool = [...ALL_QUESTIONS]; }
+            
+            window.selectCharacter = function(charKey) {
+                selectedCharacter = characters[charKey];
+                playerElement.innerHTML = selectedCharacter;
+                characterModal.style.display = 'none';
+                initializeGame();
+            }
+
+            function updateUI() {
+                scoreValue.textContent = score;
+                livesDisplay.innerHTML = Array.from({ length: 5 }, (_, i) => i < lives ? '❤️' : '🖤').join('');
+            }
+
+            window.initializeGame = function() {
+                messageBox.textContent = "Ayo mulai petualangan!";
+                start = { x: 0, y: 3 };
+                finish = { x: 9, y: 2 };
+                player = { x: start.x, y: start.y, dir: 'right' };
+                
+                program = [];
+                isExecuting = false;
+                score = 0;
+                lives = 5;
+                
+                resetQuestionPool();
+                updateUI();
+                
+                placeObstacles();
+                createBoardCells();
+                renderBoard();
+                renderProgram();
+            }
+
+            function createBoardCells() {
+                gameBoard.innerHTML = '';
+                for (let y = 0; y < GRID_Y; y++) {
+                    for (let x = 0; x < GRID_X; x++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        cell.id = `cell-${x}-${y}`;
+                        cell.innerHTML = `<div class="cell-content"></div>`;
+                        gameBoard.appendChild(cell);
+                    }
+                }
+            }
+
+            function placeObstacles() {
+                obstacles = [];
+                const mainObstacleTypes = ['❓', '🌳', '🚧'];
+                const occupied = new Set([`${start.x},${start.y}`, `${finish.x},${finish.y}`]);
+                
+                let mainObstacleCount = 0;
+                while(mainObstacleCount < 5) {
+                    const x = Math.floor(Math.random() * GRID_X);
+                    const y = Math.floor(Math.random() * GRID_Y);
+                    const posKey = `${x},${y}`;
+                    if (!occupied.has(posKey)) {
+                       const type = mainObstacleTypes[Math.floor(Math.random() * mainObstacleTypes.length)];
+                       obstacles.push({ x, y, type });
+                       occupied.add(posKey);
+                       mainObstacleCount++;
+                    }
+                }
+                const coinCount = Math.floor(Math.random() * 4) + 4;
+                let currentCoinCount = 0;
+                while(currentCoinCount < coinCount) {
+                    const x = Math.floor(Math.random() * GRID_X);
+                    const y = Math.floor(Math.random() * GRID_Y);
+                    const posKey = `${x},${y}`;
+                    if (!occupied.has(posKey)) {
+                       obstacles.push({ x, y, type: '🪙' });
+                       occupied.add(posKey);
+                       currentCoinCount++;
+                    }
+                }
+            }
+
+            function renderBoard() {
+                gameBoard.querySelectorAll('.cell-content').forEach(c => c.innerHTML = '');
+                document.getElementById(`cell-${finish.x}-${finish.y}`).querySelector('.cell-content').innerHTML = '🏆';
+                obstacles.forEach(o => {
+                    const cellContent = document.getElementById(`cell-${o.x}-${o.y}`).querySelector('.cell-content');
+                    if (o.type === '🪙') {
+                        cellContent.innerHTML = `<span class="small-coin">${o.type}</span>`;
+                    } else {
+                        cellContent.innerHTML = o.type; 
+                    }
+                });
+                
+                const cellWidth = 100 / GRID_X;
+                const cellHeight = 100 / GRID_Y;
+                playerElement.style.left = `${player.x * cellWidth}%`;
+                playerElement.style.top = `${player.y * cellHeight}%`;
+                playerElement.style.width = `${cellWidth}%`;
+                playerElement.style.height = `${cellHeight}%`;
+
+                playerElement.className = `cell-content absolute ${directionClasses[player.dir]}`;
+            }
+            
+            window.addCommand = function(command) {
+                if (isExecuting || lives <= 0) return;
+                playSfx('click');
+                program.push(command);
+                renderProgram();
+            }
+
+            function renderProgram() {
+                programList.innerHTML = program.map(cmd => {
+                    const symbols = { 'maju': '↑', 'kiri': '↺', 'kanan': '↻' };
+                    return `<div class="bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded-full text-sm">${symbols[cmd]} ${cmd.toUpperCase()}</div>`;
+                }).join('');
+            }
+
+            window.clearProgram = function() { program = []; renderProgram(); }
+
+            window.executeProgram = async function() {
+                if (isExecuting || program.length === 0 || lives <= 0) return;
+                isExecuting = true; runBtn.disabled = true; runBtn.classList.add('opacity-50');
+                messageBox.textContent = "Menjalankan program...";
+                previousPlayerState = { ...player };
+                for (const command of program) {
+                    await new Promise(r => setTimeout(r, 400));
+                    switch (command) {
+                        case 'maju': moveForward(); break;
+                        case 'kiri': turn('left'); break;
+                        case 'kanan': turn('right'); break;
+                    }
+                    renderBoard();
+                }
+                await new Promise(r => setTimeout(r, 400));
+                checkCurrentTile();
+            }
+
+            function finishExecution() {
+                 isExecuting = false; runBtn.disabled = false; runBtn.classList.remove('opacity-50');
+                 clearProgram();
+            }
+
+            function moveForward() {
+                playSfx('move');
+                let newX = player.x, newY = player.y;
+                if (player.dir === 'up') newY--; 
+                if (player.dir === 'down') newY++;
+                if (player.dir === 'left') newX--; 
+                if (player.dir === 'right') newX++;
+                
+                if (newX >= 0 && newX < GRID_X && newY >= 0 && newY < GRID_Y) {
+                    player.x = newX; 
+                    player.y = newY;
+                } else { 
+                    messageBox.textContent = "Aduh, menabrak batas!"; 
+                }
+            }
+            
+            function turn(direction) {
+                playSfx('move');
+                const dirs = ['up', 'right', 'down', 'left'];
+                const currentIdx = dirs.indexOf(player.dir);
+                if (direction === 'right') {
+                    player.dir = dirs[(currentIdx + 1) % 4];
+                } else { // left
+                    let newIdx = currentIdx - 1;
+                    if (newIdx < 0) { newIdx = 3; }
+                    player.dir = dirs[newIdx];
+                }
+            }
+
+            function checkCurrentTile() {
+                const foundObstacle = obstacles.find(o => o.x === player.x && o.y === player.y);
+                if (foundObstacle) { handleObstacle(foundObstacle); } 
+                else if (player.x === finish.x && player.y === finish.y) { handleWin(); } 
+                else { messageBox.textContent = "Program selesai dijalankan."; finishExecution(); }
+            }
+            
+            function handleObstacle(obstacle) {
+                playSfx('obstacle');
+                if (questionPool.length === 0) { resetQuestionPool(); }
+                const questionIndex = Math.floor(Math.random() * questionPool.length);
+                const randomQuestion = questionPool.splice(questionIndex, 1)[0];
+                currentObstacle = { ...obstacle, activeQuestion: randomQuestion };
+                questionText.textContent = randomQuestion.q;
+                answerInput.value = '';
+                modal.style.display = 'flex';
+                setTimeout(() => {
+                    modal.querySelector('.modal-backdrop').style.opacity = '1';
+                    modal.querySelector('.modal-content').style.transform = 'scale(1)';
+                }, 10);
+                answerInput.focus();
+            }
+
+            function submitAnswer() {
+                const playerAnswer = answerInput.value.trim().toLowerCase();
+                const correctAnswer = currentObstacle.activeQuestion.a.toLowerCase();
+                const correct = playerAnswer.split(' ').sort().join(' ') === correctAnswer.split(' ').sort().join(' ');
+
+                if (correct) {
+                    playSfx('correct');
+                    if (currentObstacle.type === '🪙') {
+                        score += 25;
+                        messageBox.textContent = "Koin Emas Didapatkan! +25 Poin!";
+                    } else {
+                        score += 10;
+                        messageBox.textContent = "Jawaban Benar! Rintangan hilang.";
+                    }
+                    updateUI();
+                    obstacles = obstacles.filter(o => !(o.x === currentObstacle.x && o.y === currentObstacle.y));
+                    currentObstacle = null;
+                    renderBoard();
+                } else {
+                    playSfx('wrong');
+                    lives--;
+                    updateUI();
+                    if (currentObstacle.type === '🪙') {
+                        messageBox.textContent = "Jawaban Salah! Kembali ke awal!";
+                        player = { x: start.x, y: start.y, dir: 'right' };
+                    } else {
+                        messageBox.textContent = `Jawaban Salah! Sisa ${lives} kesempatan.`;
+                        player = { ...previousPlayerState };
+                    }
+                    if (lives <= 0) {
+                        messageBox.textContent = "Kesempatan habis!";
+                        handleGameOver();
+                    }
+                    renderBoard();
+                }
+                closeModal();
+                finishExecution();
+            }
+
+            function closeModal() {
+                modal.querySelector('.modal-backdrop').style.opacity = '0';
+                modal.querySelector('.modal-content').style.transform = 'scale(0.9)';
+                setTimeout(() => { modal.style.display = 'none'; }, 300);
+            }
+            
+            window.closeWinModal = function() {
+                winModal.querySelector('.modal-backdrop').style.opacity = '0';
+                winModal.querySelector('.modal-content').style.transform = 'scale(0.9)';
+                setTimeout(() => { winModal.style.display = 'none'; }, 300);
+            }
+            
+            window.closeGameOverModal = function() {
+                gameOverModal.querySelector('.modal-backdrop').style.opacity = '0';
+                gameOverModal.querySelector('.modal-content').style.transform = 'scale(0.9)';
+                setTimeout(() => { gameOverModal.style.display = 'none'; }, 300);
+            }
+
+            function handleWin() {
+                playSfx('win');
+                score += 50;
+                updateUI();
+                messageBox.textContent = "Selamat! Kamu menemukan harta karun!";
+                winModal.style.display = 'flex';
+                setTimeout(() => { winModal.querySelector('.modal-backdrop').style.opacity = '1'; winModal.querySelector('.modal-content').style.transform = 'scale(1)'; }, 10);
+                finishExecution();
+            }
+            
+            function handleGameOver() {
+                playSfx('gameover');
+                finalScore.textContent = score;
+                gameOverModal.style.display = 'flex';
+                 setTimeout(() => { gameOverModal.querySelector('.modal-backdrop').style.opacity = '1'; gameOverModal.querySelector('.modal-content').style.transform = 'scale(1)'; }, 10);
+                finishExecution();
+            }
+
+            submitAnswerBtn.addEventListener('click', submitAnswer);
+            answerInput.addEventListener('keyup', (event) => { if (event.key === 'Enter') submitAnswer(); });
+            
+            characterModal.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
